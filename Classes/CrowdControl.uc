@@ -10,6 +10,14 @@ replication
         SetPawnBoneScale;
 }
 
+function bool CheckReplacement( Actor Other, out byte bSuperRelevant )
+{
+    if ( (xBombFlag(Other) != None) && (CrowdControlBombFlag(Other)==None) ){
+        ReplaceWith( Other, "UT2k4CrowdControl.CrowdControlBombFlag");
+        return false;
+    }
+    return true;
+}
 
 simulated function InitCC()
 {
@@ -274,13 +282,13 @@ static event string GetDescriptionText(string PropName) {
 static function FillPlayInfo(PlayInfo PlayInfo) {
     Super.FillPlayInfo(PlayInfo);  // Always begin with calling parent
     
-    PlayInfo.AddSetting("Crowd Control", "crowd_control_addr", "Crowd Control Address", 0, 2, "Text","15");
+    PlayInfo.AddSetting("Crowd Control", "crowd_control_addr", "Crowd Control Address", 0, 2, "Text","50");
 }
 
 defaultproperties
 {
     bAddToServerPackages=True
     FriendlyName="Crowd Control"
-    Description="Let viewers mess with your game by sending effects!"
+    Description="Let viewers mess with your game by sending effects!||Use this mutator in combination with Crowd Control from https://crowdcontrol.live/||Encountering issues or just want to learn more?  Join us on Discord at https://Mods4Ever.com/discord||Source code and updates for this mutator can be found at https://Github.com/TheAstropath/UT2K4CrowdControl"
     crowd_control_addr="127.0.0.1"
 }

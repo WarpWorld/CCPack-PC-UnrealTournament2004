@@ -13,7 +13,7 @@ struct EffectConfig {
 var config String defaultMutatorName;
 var config int effectFrequency;
 var config float effectChance;
-var config EffectConfig effects[50];
+var config EffectConfig effects[75];
 var config String botNames[75];
 
 var int effectCountdown;
@@ -23,6 +23,15 @@ replication
 {
     reliable if ( Role == ROLE_Authority )
         SetPawnBoneScale;
+}
+
+function bool CheckReplacement( Actor Other, out byte bSuperRelevant )
+{
+    if ( (xBombFlag(Other) != None) && (CrowdControlBombFlag(Other)==None) ){
+        ReplaceWith( Other, "UT2k4CrowdControl.CrowdControlBombFlag");
+        return false;
+    }
+    return true;
 }
 
 function InitCC()
@@ -657,6 +666,7 @@ static event string GetDescriptionText(string PropName) {
     switch (PropName) {
         case "effectFrequency":  return "How frequently the mutator will try to send effects";
         case "effectChance":  return "The chance for an effect to go off each time the mutator tries to send an effect";
+        case "defaultMutatorName":  return "The name that Simulated Crowd Control will say sent the effect";
     }
     return Super.GetDescriptionText(PropName);
 }
@@ -666,13 +676,14 @@ static function FillPlayInfo(PlayInfo PlayInfo) {
     
     PlayInfo.AddSetting("Simulated Crowd Control", "effectFrequency", "Effect Frequency", 0, 2, "Text","3;1:300");
     PlayInfo.AddSetting("Simulated Crowd Control", "effectChance", "Effect Chance", 0, 2, "Text","4;0.01:1.0");
+    PlayInfo.AddSetting("Simulated Crowd Control", "defaultMutatorName", "'Viewer' Name", 0, 2, "Text","30");
 }
 
 defaultproperties
 {
     bAddToServerPackages=True
     FriendlyName="Simulated Crowd Control"
-    Description="Randomly send Crowd Control effects without any viewers!"
+    Description="Randomly send Crowd Control effects without any viewers!||Encountering issues or just want to learn more?  Join us on Discord at https://Mods4Ever.com/discord||Source code and updates for this mutator can be found at https://Github.com/TheAstropath/UT2K4CrowdControl"
     defaultMutatorName="Simulated Crowd Control"
     effectFrequency=1
     effectChance=0.05
@@ -707,19 +718,28 @@ defaultproperties
     effects(28)=(EffectName="return_ctf_flags",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
     effects(29)=(EffectName="big_head",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
     effects(30)=(EffectName="headless",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
-    //effects()=(EffectName="limbless",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
-    //effects()=(EffectName="full_fat",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
-    //effects()=(EffectName="skin_and_bones",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
-    effects(31)=(EffectName="low_grav",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
-    effects(32)=(EffectName="ice_physics",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
-    effects(33)=(EffectName="flood",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
-    effects(34)=(EffectName="last_place_ultra_adrenaline",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(35)=(EffectName="all_berserk",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(36)=(EffectName="all_invisible",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(37)=(EffectName="all_regen",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(38)=(EffectName="thrust",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(39)=(EffectName="team_balance",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
-    effects(40)=(EffectName="announcer",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(31)=(EffectName="limbless",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
+    effects(32)=(EffectName="full_fat",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
+    effects(33)=(EffectName="skin_and_bones",quantityMin=0,quantityMax=0,durationMin=5,durationMax=120,enabled=true)
+    effects(34)=(EffectName="low_grav",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(35)=(EffectName="ice_physics",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(36)=(EffectName="flood",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(37)=(EffectName="last_place_ultra_adrenaline",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(38)=(EffectName="all_berserk",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(39)=(EffectName="all_invisible",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(40)=(EffectName="all_regen",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(41)=(EffectName="thrust",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(42)=(EffectName="team_balance",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(43)=(EffectName="announcer",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(44)=(EffectName="fumble_bombing_run_ball",quantityMin=0,quantityMax=0,durationMin=0,durationMax=0,enabled=true)
+    effects(45)=(EffectName="bombing_run_hot_potato",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(46)=(EffectName="attack_team_double_dmg",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(47)=(EffectName="defend_team_double_dmg",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(48)=(EffectName="head_shots_only",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(49)=(EffectName="infinite_adrenaline",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(50)=(EffectName="thorns",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(51)=(EffectName="octojump",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
+    effects(52)=(EffectName="pint_sized",quantityMin=0,quantityMax=0,durationMin=10,durationMax=60,enabled=true)
     botNames(0)="Jim"
     botNames(1)="James"
     botNames(2)="Jeremy"
