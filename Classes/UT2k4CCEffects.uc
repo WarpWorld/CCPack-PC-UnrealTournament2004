@@ -28,6 +28,23 @@ const MeleeTimerDefault = 60;
 var int vampireTimer;
 const VampireTimerDefault = 60;
 
+var int teamDamageTimer;
+const TeamDamageTimerDefault = 60;
+var bool teamDamageHoldingTeam;
+
+var int headShotTimer;
+const HeadShotTimerDefault = 60;
+
+var int thornsTimer;
+const ThornsTimerDefault = 60;
+
+var int octoJumpTimer;
+const OctoJumpTimerDefault = 60;
+var int origNumJumps;
+
+var int infAdrenalineTimer;
+const InfAdrenalineTimerDefault = 60;
+
 const MaxAddedBots = 10;
 var Bot added_bots[10];
 var int numAddedBots;
@@ -49,7 +66,8 @@ enum EBodyEffect
     BE_Headless,
     BE_NoLimbs,
     BE_Fat,
-    BE_Skinny
+    BE_Skinny,
+    BE_PintSized
 };
 var EBodyEffect bodyEffect;
 
@@ -101,6 +119,10 @@ var int bounceTimer;
 const BounceTimerDefault = 60;
 var Vector BouncyCastleVelocity;
 
+var int hotPotatoTimer;
+const HotPotatoTimerDefault = 60;
+const HotPotatoMaxTime = 5;
+
 var int cfgMinPlayers;
 
 var bool bFat,bFast;
@@ -112,7 +134,7 @@ var bool effectSelectInit;
 replication
 {
     reliable if ( Role == ROLE_Authority )
-        behindTimer,speedTimer,meleeTimer,iceTimer,vampireTimer,floodTimer,forceWeaponTimer,bFat,bFast,forcedWeapon,numAddedBots,targetPlayer,GetEffectList,bodyEffectTimer,bodyEffect,gravityTimer,setLimblessScale,SetAllBoneScale,ModifyPlayer,SetPawnBoneScale,SetAllPlayerAnnouncerVoice,fogTimer,bounceTimer;
+        behindTimer,speedTimer,meleeTimer,iceTimer,vampireTimer,floodTimer,forceWeaponTimer,bFat,bFast,forcedWeapon,numAddedBots,targetPlayer,GetEffectList,bodyEffectTimer,bodyEffect,gravityTimer,setLimblessScale,SetAllBoneScale,ModifyPlayer,SetPawnBoneScale,SetAllPlayerAnnouncerVoice,fogTimer,bounceTimer,hotPotatoTimer,teamDamageTimer,teamDamageHoldingTeam,headShotTimer,thornsTimer,octoJumpTimer;
 }
 
 function Init(Mutator baseMut)
@@ -168,9 +190,12 @@ function Broadcast(string msg)
 }
 
 
-simulated function GetEffectList(out string effects[15], out int numEffects)
+simulated function GetEffectList(out string effects[20], out int numEffects)
 {
     local int i;
+    local int hotPotatoRemaining;
+    local xBombingRun brGame;
+    local CrowdControlBombFlag ccBomb;
 
     if (behindTimer > 0) {
         effects[i]="Third-Person: "$behindTimer;
@@ -212,8 +237,39 @@ simulated function GetEffectList(out string effects[15], out int numEffects)
         effects[i]="Bouncy Castle: "$bounceTimer;
         i++;
     }
+    if (hotPotatoTimer > 0) {
+        effects[i]="Hot Potato: "$hotPotatoTimer;
+
+        brGame=xBombingRun(Level.Game);
+        if (brGame!=None){
+            ccBomb = CrowdControlBombFlag(brGame.Bomb);
+            if (ccBomb!=None && ccBomb.Holder!=None){
+                hotPotatoRemaining = HotPotatoMaxTime - (Level.TimeSeconds - ccBomb.GrabTime) + 1;
+                effects[i] $= " ("$hotPotatoRemaining$")";
+            }
+        }
+
+        i++;
+    }
     if (vampireTimer > 0) {
         effects[i]="Vampire: "$vampireTimer;
+        i++;
+    }
+    if (teamDamageTimer > 0) {
+        if (teamDamageHoldingTeam){
+            effects[i]="Attacking";
+        } else {
+            effects[i]="Defending";
+        }
+        effects[i]$=" Team Double Damage: "$teamDamageTimer;
+        i++;
+    }
+    if (headShotTimer > 0) {
+        effects[i]="Head Shots Only: "$headShotTimer;
+        i++;
+    }
+    if (thornsTimer > 0) {
+        effects[i]="Thorns: "$thornsTimer;
         i++;
     }
     if (forceWeaponTimer > 0) {
@@ -231,8 +287,19 @@ simulated function GetEffectList(out string effects[15], out int numEffects)
             effects[i]="Skin and Bones: ";
         }else if (bodyEffect==BE_Headless){
             effects[i]="Headless: ";
+        }else if (bodyEffect==BE_PintSized){
+            effects[i]="Pint-Sized: ";
         }
         effects[i]=effects[i]$bodyEffectTimer;
+        i++;
+    }
+    if (infAdrenalineTimer > 0) {
+        effects[i]="Infinite Adrenaline: "$infAdrenalineTimer;
+        i++;
+    }
+
+    if (octoJumpTimer > 0) {
+        effects[i]="Octojump: "$octoJumpTimer;
         i++;
     }
 
@@ -294,13 +361,38 @@ function PeriodicUpdates()
             BounceAllPlayers();
         }
     } 
+    if (hotPotatoTimer > 0) {
+        hotPotatoTimer--;
+        if (hotPotatoTimer <= 0) {
+            StopCrowdControlEvent("bombing_run_hot_potato",true);
+        } else {
+            BRHotPotatoCheck();
+        }
+    } 
     if (vampireTimer > 0) {
         vampireTimer--;
         if (vampireTimer <= 0) {
             StopCrowdControlEvent("vampire_mode",true);
         }
     }  
-    
+    if (teamDamageTimer > 0) {
+        teamDamageTimer--;
+        if (teamDamageTimer <= 0) {
+            StopCrowdControlEvent("attack_team_double_dmg",true);
+        }
+    }  
+    if (headShotTimer > 0) {
+        headShotTimer--;
+        if (headShotTimer <= 0) {
+            StopCrowdControlEvent("head_shots_only",true);
+        }
+    }  
+    if (thornsTimer > 0) {
+        thornsTimer--;
+        if (thornsTimer <= 0) {
+            StopCrowdControlEvent("thorns",true);
+        }
+    }  
     if (forceWeaponTimer > 0) {
         forceWeaponTimer--;
         if (forceWeaponTimer <= 0) {
@@ -311,6 +403,7 @@ function PeriodicUpdates()
         bodyEffectTimer--;
         if (bodyEffectTimer <= 0) {
             StopCrowdControlEvent("big_head",true);
+            StopCrowdControlEvent("pint_sized",true);
         }
     }  
     if (gravityTimer > 0) {
@@ -318,7 +411,23 @@ function PeriodicUpdates()
         if (gravityTimer <= 0) {
             StopCrowdControlEvent("low_grav",true);
         }
-    }  
+    }
+    if (infAdrenalineTimer > 0) {
+        infAdrenalineTimer--;
+        if (infAdrenalineTimer <= 0) {
+            StopCrowdControlEvent("infinite_adrenaline",true);
+        } else {
+            InfiniteAdrenalineRefill();
+        }
+    } 
+
+    if (octoJumpTimer > 0) {
+        octoJumpTimer--;
+        if (octoJumpTimer <= 0) {
+            StopCrowdControlEvent("octojump",true);
+        }
+    }
+
     
 
 }
@@ -393,6 +502,8 @@ simulated function ModifyPlayer(Pawn Other)
             SetAllBoneScale(Other,FatScale);
         } else if (bodyEffect==BE_Skinny){
             SetAllBoneScale(Other,SkinnyScale);
+        } else if (bodyEffect==BE_PintSized){
+            MakePintSized(xPawn(Other));
         }
     }
 
@@ -402,6 +513,12 @@ simulated function ModifyPlayer(Pawn Other)
         } else {
             Other.GroundSpeed = class'Pawn'.Default.GroundSpeed / 3;
         }
+    }
+
+    if (octoJumpTimer>0 && xPawn(Other)!=None){
+        xPawn(Other).MaxMultiJump=7;
+        xPawn(Other).MultiJumpRemaining=7;
+        xPawn(Other).MultiJumpBoost=50;
     }
 }
 
@@ -547,6 +664,18 @@ function SetAllPlayersGroundSpeed(int speed)
     foreach AllActors(class'Pawn',p) {
         //Broadcast("Speed before: "$p.GroundSpeed$"  Speed After: "$speed);
         p.GroundSpeed = speed;
+    }
+}
+
+//The multijumps are on top of the regular jump, so numJumps=3 means you can jump 4 times
+function SetAllPlayersMultiJump(int numJumps, int jumpBoost)
+{
+    local xPawn p;
+    
+    foreach AllActors(class'xPawn',p) {
+        p.MaxMultiJump = numJumps;
+        p.MultiJumpRemaining = numJumps;
+        p.MultiJumpBoost=jumpBoost;
     }
 }
 
@@ -1159,9 +1288,64 @@ function BounceAllPlayers()
     }    
 }
 
+function BRHotPotatoCheck()
+{
+    local xBombingRun brGame;
+    local CrowdControlBombFlag ccBomb;
+
+    brGame=xBombingRun(Level.Game);
+    if (brGame==None){
+        return;
+    }
+
+    ccBomb = CrowdControlBombFlag(brGame.Bomb);
+    if (ccBomb==None){
+        return;
+    }
+
+    if (Level.TimeSeconds - ccBomb.GrabTime >= HotPotatoMaxTime) {
+        ccBomb.Holder.TakeDamage
+        (
+            10000,
+            ccBomb.Holder,
+            ccBomb.Holder.Location,
+            Vect(0,0,0),
+            class'HotPotato'
+        );
+    }
+}
+
+function InfiniteAdrenalineRefill()
+{
+    local Controller c;
+    
+    foreach AllActors(class'Controller',c) {
+        if (c.bAdrenalineEnabled==True){
+            c.Adrenaline=c.AdrenalineMax;
+        }
+    }
+}
+
 function bool IsGameActive()
 {
     return !Level.Game.bWaitingToStartMatch && !Level.Game.bGameEnded;
+}
+
+function bool IsAdrenalineActive()
+{
+    local Controller c;
+    local AdrenalinePickup p;
+    
+    foreach AllActors(class'Controller',c) {
+        return c.bAdrenalineEnabled;
+    }
+
+    foreach AllActors(class'AdrenalinePickup',p){
+        return True;
+    }
+
+    return False;
+
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1299,7 +1483,9 @@ function int GottaGoFast(String viewer, int duration)
     if (speedTimer>0) {
         return TempFail;
     }
-
+    if (floodTimer>0) {
+        return TempFail;
+    }
     SetAllPlayersGroundSpeed(class'Pawn'.Default.GroundSpeed * 3);
     if (duration==0){
         duration = SpeedTimerDefault;
@@ -1317,7 +1503,9 @@ function int GottaGoSlow(String viewer, int duration)
     if (speedTimer>0) {
         return TempFail;
     }
-
+    if (floodTimer>0) {
+        return TempFail;
+    }
     SetAllPlayersGroundSpeed(class'Pawn'.Default.GroundSpeed / 3);
 
     if (duration==0){
@@ -1790,6 +1978,56 @@ function int BlueRedeemerShell(String viewer)
     return Success;
 }
 
+function MakePintSized(xPawn P)
+{
+    if (P==None){return;}
+    
+    P.SetDrawscale(0.5 * P.Default.DrawScale);
+    P.bCanCrouch = false;
+    P.SetCollisionSize(P.CollisionRadius, 0.5*P.CollisionHeight);
+    P.BaseEyeheight = 0.8 * P.CollisionHeight;
+}
+
+function EndPintSized()
+{
+    local xPawn P;
+
+    foreach AllActors(class'xPawn',P){
+        P.SetDrawscale(P.Default.DrawScale);
+        P.bCanCrouch = P.default.bCanCrouch;
+        P.BaseEyeheight = P.Default.BaseEyeheight;
+        P.ForceCrouch();
+    }
+}
+
+simulated function int StartPintSized(string viewer, int duration)
+{
+    local xPawn p;
+    local bool changed;
+
+    if (bodyEffectTimer>0) {
+        return TempFail;
+    }
+
+    foreach AllActors(class'xPawn',p){
+        changed=True;
+        MakePintSized(p);
+    }
+
+    //No pawns to change!
+    if (!changed){
+        return TempFail;
+    }
+
+    Broadcast(viewer@"made everyone pint-sized!");
+    if (duration==0){
+        duration = BodyEffectTimerDefault;
+    }
+    bodyEffectTimer = duration;
+    bodyEffect=BE_PintSized;
+    return Success;
+}
+
 simulated function int StartBigHeadMode(string viewer, int duration)
 {
     local Pawn p;
@@ -1983,6 +2221,116 @@ function int StartVampireMode(string viewer, int duration)
     return Success;
 }
 
+function int StartTeamDamageMode(string viewer, int duration, bool holdingTeam)
+{
+    local class<GameRules> newRuleClass;
+    local string msg;
+
+    if (teamDamageTimer>0) {
+        return TempFail;
+    }
+    if (headShotTimer>0) {
+        return TempFail;
+    }
+    if (thornsTimer>0){
+        return TempFail;
+    }
+    if (xBombingRun(Level.Game)==None && ASGameInfo(Level.Game)==None){
+        return TempFail;
+    }
+
+    if (holdingTeam){
+        newRuleClass=class'OffenseDoubleDamageRules';
+    } else {
+        newRuleClass=class'DefenseDoubleDamageRules';
+    }
+
+    //Check if game rule is already in place, fail if it is
+    if (IsGameRuleActive(newRuleClass)){
+        return TempFail;
+    }
+
+    //Attempt to add the game rules, fail if it doesn't for some reason
+    if (!AddNewGameRule(newRuleClass)){
+        return TempFail;
+    }
+
+    teamDamageHoldingTeam = holdingTeam;
+
+    msg=viewer$" made the ";
+    if (holdingTeam){
+        msg$="attacking";
+    } else {
+        msg$="defending";
+    }
+    msg$=" team do double damage!";
+
+    Broadcast(msg);
+    if (duration==0){
+        duration = TeamDamageTimerDefault;
+    }
+    teamDamageTimer = duration;
+    return Success;
+}
+
+function int StartHeadShotsOnly(string viewer, int duration)
+{
+    if (headShotTimer>0) {
+        return TempFail;
+    }
+    if (teamDamageTimer>0) {
+        return TempFail;
+    }
+    if (thornsTimer>0){
+        return TempFail;
+    }
+    //Check if game rule is already in place, fail if it is
+    if (IsGameRuleActive(class'HeadShotsOnlyRules')){
+        return TempFail;
+    }
+
+    //Attempt to add the game rules, fail if it doesn't for some reason
+    if (!AddNewGameRule(class'HeadShotsOnlyRules')){
+        return TempFail;
+    }
+
+    Broadcast(viewer@"made only head shots count!");
+    if (duration==0){
+        duration = HeadShotTimerDefault;
+    }
+    headShotTimer = duration;
+    return Success;
+}
+
+function int StartThornsMode(string viewer, int duration)
+{
+    if (headShotTimer>0) {
+        return TempFail;
+    }
+    if (teamDamageTimer>0) {
+        return TempFail;
+    }
+    if (thornsTimer>0){
+        return TempFail;
+    }
+    //Check if game rule is already in place, fail if it is
+    if (IsGameRuleActive(class'ThornsRules')){
+        return TempFail;
+    }
+
+    //Attempt to add the game rules, fail if it doesn't for some reason
+    if (!AddNewGameRule(class'ThornsRules')){
+        return TempFail;
+    }
+
+    Broadcast(viewer@"gave everyone thorns!");
+    if (duration==0){
+        duration = ThornsTimerDefault;
+    }
+    thornsTimer = duration;
+    return Success;
+}
+
 function int ForceWeaponUse(String viewer, String weaponName, int duration)
 {
     local class<Weapon> weaponClass;
@@ -2084,6 +2432,9 @@ function int EnableMoonPhysics(string viewer, int duration)
     if (gravityTimer>0) {
         return TempFail;
     }
+    if (floodTimer>0) {
+        return TempFail;
+    }
     if (duration==0){
         duration = GravityTimerDefault;
     }
@@ -2097,6 +2448,10 @@ function int EnableMoonPhysics(string viewer, int duration)
 function int EnableIcePhysics(string viewer, int duration)
 {
     if (iceTimer>0) {
+        return TempFail;
+    }
+
+    if (floodTimer>0) {
         return TempFail;
     }
     
@@ -2114,6 +2469,18 @@ function int EnableIcePhysics(string viewer, int duration)
 function int StartFlood(string viewer, int duration)
 {
     if (floodTimer>0) {
+        return TempFail;
+    }
+    if (iceTimer>0) {
+        return TempFail;
+    }
+    if (gravityTimer>0) {
+        return TempFail;
+    }
+    if (octoJumpTimer>0) {
+        return TempFail;
+    }
+    if (speedTimer>0) {
         return TempFail;
     }
     Broadcast(viewer@"started a flood!");
@@ -2320,12 +2687,130 @@ function int ResetOnslaughtPowerNodes(string viewer)
     return Success;
 }
 
+function int FumbleBombingRunBall(string viewer)
+{
+    local xBombingRun brGame;
+    local int throwSpeed;
+
+    brGame=xBombingRun(Level.Game);
+    if (brGame==None){
+        return TempFail;
+    }
+
+    if (brGame.Bomb==None){
+        return TempFail;
+    }
+
+    if (brGame.Bomb.Holder==None){
+        return TempFail;
+    }
+
+    throwSpeed = 2000+Rand(1000);
+    brGame.Bomb.BroadcastLocalizedMessage( brGame.Bomb.MessageClass, 2, brGame.Bomb.Holder.PlayerReplicationInfo, None, brGame.Teams[brGame.Bomb.Holder.PlayerReplicationInfo.Team.TeamIndex] );
+    brGame.Bomb.Throw(brGame.Bomb.Holder.Location,VRand()*throwSpeed);
+
+    Broadcast(viewer@"caused the ball to be fumbled!");
+
+    return Success;
+}
+
+function int BombingRunHotPotato(string viewer, int duration)
+{
+    local xBombingRun brGame;
+    local CrowdControlBombFlag ccBomb;
+
+    brGame=xBombingRun(Level.Game);
+    if (brGame==None){
+        return TempFail;
+    }
+
+    if (hotPotatoTimer>0) {
+        return TempFail;
+    }
+
+    ccBomb = CrowdControlBombFlag(brGame.Bomb);
+    if (ccBomb==None){
+        Broadcast("The ball isn't a crowd control ball!");
+        return TempFail;
+    }
+
+    if (ccBomb.Holder!=None){
+        ccBomb.GrabTime=Level.TimeSeconds; //Reset the grab time to now
+    }
+
+    Broadcast(viewer@"made the ball a hot potato!");
+
+    if (duration==0){
+        duration = HotPotatoTimerDefault;
+    }
+    hotPotatoTimer = duration;
+    return Success;
+}
+
+function int StartInfiniteAdrenaline(string viewer, int duration)
+{
+    local Controller c;
+    
+    if (infAdrenalineTimer>0){
+        return TempFail;
+    }
+
+    foreach AllActors(class'Controller',c) {
+        if (c.bAdrenalineEnabled==False){
+            return TempFail;
+        }
+        c.Adrenaline=c.AdrenalineMax;
+    }
+   
+    Broadcast(viewer$" has given everyone infinite adrenaline!");
+
+    if (duration==0){
+        duration = InfAdrenalineTimerDefault;
+    }
+    infAdrenalineTimer = duration;
+    return Success;
+}
+
+function int StartOctoJump(String viewer, int duration)
+{
+    local xPawn p;
+
+    if (octoJumpTimer>0) {
+        return TempFail;
+    }
+    if (floodTimer>0) {
+        return TempFail;
+    }
+    foreach AllActors(class'xPawn',p){
+        origNumJumps=p.MaxMultiJump;
+        break;
+    }
+
+    SetAllPlayersMultiJump(7,50);
+
+    if (duration==0){
+        duration = OctoJumpTimerDefault;
+    }
+    octoJumpTimer = duration;
+    Broadcast(viewer$" made everyone able to jump 8 times!");
+   
+    return Success;   
+}
+
+function EndOctoJump()
+{
+    SetAllPlayersMultiJump(origNumJumps,class'xPawn'.Default.MultiJumpBoost);
+}
+
+
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////                                  CROWD CONTROL EFFECT MAPPING                                       ////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 function HandleEffectSelectability(UT2k4CrowdControlLink ccLink)
 {
+    local bool adrenaline;
+
     if (effectSelectInit==False){
         ccLink.sendEffectSelectability("full_fat",isLocal);
         ccLink.sendEffectSelectability("skin_and_bones",isLocal);
@@ -2337,13 +2822,18 @@ function HandleEffectSelectability(UT2k4CrowdControlLink ccLink)
         ccLink.sendEffectSelectability("team_balance",TeamGame(Level.Game)!=None);
         ccLink.sendEffectSelectability("heal_onslaught_cores",ONSOnslaughtGame(Level.Game)!=None);
         ccLink.sendEffectSelectability("reset_onslaught_links",ONSOnslaughtGame(Level.Game)!=None);
+        ccLink.sendEffectSelectability("fumble_bombing_run_ball",xBombingRun(Level.Game)!=None);
+        ccLink.sendEffectSelectability("bombing_run_hot_potato",xBombingRun(Level.Game)!=None);
+        ccLink.sendEffectSelectability("attack_team_double_dmg",xBombingRun(Level.Game)!=None || ASGameInfo(Level.Game)!=None);
+        ccLink.sendEffectSelectability("defend_team_double_dmg",xBombingRun(Level.Game)!=None || ASGameInfo(Level.Game)!=None);
     
         //Adrenaline is disabled in Onslaught
-        ccLink.sendEffectSelectability("full_adrenaline",ONSOnslaughtGame(Level.Game)==None);
-        ccLink.sendEffectSelectability("last_place_ultra_adrenaline",ONSOnslaughtGame(Level.Game)==None);
-        ccLink.sendEffectSelectability("all_berserk",ONSOnslaughtGame(Level.Game)==None);
-        ccLink.sendEffectSelectability("all_invisible",ONSOnslaughtGame(Level.Game)==None);
-        ccLink.sendEffectSelectability("all_regen",ONSOnslaughtGame(Level.Game)==None);
+        adrenaline = IsAdrenalineActive();
+        ccLink.sendEffectSelectability("full_adrenaline",adrenaline);
+        ccLink.sendEffectSelectability("last_place_ultra_adrenaline",adrenaline);
+        ccLink.sendEffectSelectability("all_berserk",adrenaline);
+        ccLink.sendEffectSelectability("all_invisible",adrenaline);
+        ccLink.sendEffectSelectability("all_regen",adrenaline);
     
         effectSelectInit=True;
     }
@@ -2386,6 +2876,13 @@ function StopAllCrowdControlEvents()
     StopCrowdControlEvent("flood");
     StopCrowdControlEvent("silent_hill");
     StopCrowdControlEvent("bouncy_castle");
+    StopCrowdControlEvent("bombing_run_hot_potato");
+    StopCrowdControlEvent("attack_team_double_dmg");
+    StopCrowdControlEvent("head_shots_only");
+    StopCrowdControlEvent("infinite_adrenaline");
+    StopCrowdControlEvent("thorns");
+    StopCrowdControlEvent("octojump");
+    StopCrowdControlEvent("pint_sized");
 }
 
 function int StopCrowdControlEvent(string code, optional bool bKnownStop)
@@ -2448,6 +2945,14 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
                 bodyEffectTimer=0;
             }
             break;
+        case "pint_sized":
+            if (bKnownStop || bodyEffectTimer > 0){
+                Broadcast("Your body returns to normal...");
+                EndPintSized();
+                BodyEffect = BE_None;
+                bodyEffectTimer=0;
+            }
+            break;
         case "low_grav":
             if (bKnownStop || gravityTimer > 0){
                 SetMoonPhysics(False);
@@ -2476,6 +2981,49 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
                 bounceTimer=0;
             }
             break;
+        case "bombing_run_hot_potato":
+            if (bKnownStop || hotPotatoTimer > 0){
+                Broadcast("The hot potato cools off...");
+                hotPotatoTimer=0;
+            }
+            break;
+        case "attack_team_double_dmg":
+        case "defend_team_double_dmg":
+            if (bKnownStop || teamDamageTimer > 0){
+                RemoveGameRule(class'DefenseDoubleDamageRules');
+                RemoveGameRule(class'OffenseDoubleDamageRules');
+                Broadcast("Team damage returns to normal...");
+                teamDamageTimer=0;
+            }
+            break;
+        case "head_shots_only":
+            if (bKnownStop || headShotTimer > 0){
+                RemoveGameRule(class'HeadShotsOnlyRules');
+                Broadcast("Damage other than head shots count again...");
+                headShotTimer=0;
+            }
+            break;
+        case "thorns":
+            if (bKnownStop || thornsTimer > 0){
+                RemoveGameRule(class'ThornsRules');
+                Broadcast("The thorns wither away...");
+                thornsTimer=0;
+            }
+            break;
+        case "infinite_adrenaline":
+            if (bKnownStop || infAdrenalineTimer > 0){
+                Broadcast("Your adrenaline has limits again...");
+                infAdrenalineTimer=0;
+            }
+            break;
+        case "octojump":
+            if (bKnownStop || octoJumpTimer > 0){
+                EndOctoJump();
+                Broadcast("You lose the ability to jump 8 times...");
+                octoJumpTimer=0;
+            }
+            break;
+        
     }
     return Success;
 }
@@ -2486,7 +3034,13 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
 //Ideas that could be added:
 //-Spawn a vehicle (all the ONSVehicle types, I guess) - would need various space checks and stuff
 //-Play a (random?) announcement
-//-Only headshots count (Use a new GameRules that discards any damage that isn't to the head region)
+//-Objective holder (Flag or ball) goes slow
+//-Can throw ball harder (or softer?)
+//-Multiple Bombing Run Balls (Multiball)
+//-Swap goal locations (Ball goal or flags)
+//-Reset Bombing Run Ball
+//-General half damage for a minute (mutually exclusive with team damage effects)
+//-Bombing run ball knocks you back when you receive it
 
 simulated function int doCrowdControlEvent(string code, string param[5], string viewer, int type, int duration) {
     
@@ -2592,6 +3146,24 @@ simulated function int doCrowdControlEvent(string code, string param[5], string 
             return HealOnslaughtCores(viewer);
         case "reset_onslaught_links":
             return ResetOnslaughtPowerNodes(viewer);
+        case "fumble_bombing_run_ball":
+            return FumbleBombingRunBall(viewer);
+        case "bombing_run_hot_potato":
+            return BombingRunHotPotato(viewer,duration);
+        case "attack_team_double_dmg":
+            return StartTeamDamageMode(viewer, duration, true);
+        case "defend_team_double_dmg":
+            return StartTeamDamageMode(viewer, duration, false);
+        case "head_shots_only":
+            return StartHeadShotsOnly(viewer,duration);
+        case "infinite_adrenaline":
+            return StartInfiniteAdrenaline(viewer,duration);
+        case "thorns":
+            return StartThornsMode(viewer,duration);
+        case "octojump":
+            return StartOctoJump(viewer,duration);
+        case "pint_sized":
+            return StartPintSized(viewer,duration);
         default:
             Broadcast("Got Crowd Control Effect -   code: "$code$"   viewer: "$viewer );
             break;
