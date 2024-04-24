@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using CrowdControl.Common;
-using CrowdControl.Games.Packs;
+﻿using CrowdControl.Common;
 using ConnectorType = CrowdControl.Common.ConnectorType;
 
 namespace CrowdControl.Games.Packs.UnrealTournament2004;
