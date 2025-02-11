@@ -38,6 +38,12 @@ const HeadShotTimerDefault = 60;
 var int thornsTimer;
 const ThornsTimerDefault = 60;
 
+var int winHalfDmgTimer;
+const WinHalfDmgTimerDefault = 60;
+
+var int momentumTimer;
+const MomentumTimerDefault = 60;
+
 var int octoJumpTimer;
 const OctoJumpTimerDefault = 60;
 var int origNumJumps;
@@ -123,6 +129,22 @@ var int hotPotatoTimer;
 const HotPotatoTimerDefault = 60;
 const HotPotatoMaxTime = 5;
 
+var int tauntTimer;
+const TauntTimerDefault = 60;
+var name curTaunt;
+
+var int redLightTimer;
+var int indLightTime;
+var bool redLightGrace;
+const RedLightTimerDefault = 60;
+const LightMinimumTime = 3;
+const RedLightMaxTime = 7;
+const GreenLightMaxTime = 20;
+var bool greenLight;
+
+var int blurTimer;
+const BlurTimerDefault = 60;
+
 var int cfgMinPlayers;
 
 var bool bFat,bFast;
@@ -134,7 +156,7 @@ var bool effectSelectInit;
 replication
 {
     reliable if ( Role == ROLE_Authority )
-        behindTimer,speedTimer,meleeTimer,iceTimer,vampireTimer,floodTimer,forceWeaponTimer,bFat,bFast,forcedWeapon,numAddedBots,targetPlayer,GetEffectList,bodyEffectTimer,bodyEffect,gravityTimer,setLimblessScale,SetAllBoneScale,ModifyPlayer,SetPawnBoneScale,SetAllPlayerAnnouncerVoice,fogTimer,bounceTimer,hotPotatoTimer,teamDamageTimer,teamDamageHoldingTeam,headShotTimer,thornsTimer,octoJumpTimer;
+        behindTimer,speedTimer,meleeTimer,iceTimer,vampireTimer,floodTimer,forceWeaponTimer,bFat,bFast,forcedWeapon,numAddedBots,targetPlayer,GetEffectList,bodyEffectTimer,bodyEffect,gravityTimer,setLimblessScale,SetAllBoneScale,ModifyPlayer,SetPawnBoneScale,SetAllPlayerAnnouncerVoice,fogTimer,tauntTimer,hotPotatoTimer,teamDamageTimer,teamDamageHoldingTeam,headShotTimer,thornsTimer,winHalfDmgTimer,momentumTimer,redLightTimer,greenLight,indLightTime,octoJumpTimer;
 }
 
 function Init(Mutator baseMut)
@@ -189,8 +211,20 @@ function Broadcast(string msg)
     SendCCMessage(msg);
 }
 
+function string GenerateRGBTextCode(int r, int g, int b)
+{
+    if (r<=0) r=1;
+    if (g<=0) g=1;
+    if (b<=0) b=1;
 
-simulated function GetEffectList(out string effects[20], out int numEffects)
+    if (r>255) r=255;
+    if (g>255) g=255;
+    if (b>255) b=255;
+
+    return chr(27)$chr(r)$chr(g)$chr(b);
+}
+
+simulated function GetEffectList(out string effects[30], out int numEffects)
 {
     local int i;
     local int hotPotatoRemaining;
@@ -307,6 +341,28 @@ simulated function GetEffectList(out string effects[20], out int numEffects)
         effects[i]="Added Bots: "$numAddedBots;
         i++;
     }
+    if (tauntTimer > 0) {
+        effects[i]="Taunting: "$tauntTimer;
+        i++;
+    }
+    if (winHalfDmgTimer > 0) {
+        effects[i]="Winner Half Damage: "$winHalfDmgTimer;
+        i++;
+    }
+    if (redLightTimer > 0) {
+        effects[i]="Red Light, Green Light: "$redLightTimer;
+        if (greenLight){
+            effects[i]=effects[i] $ GenerateRGBTextCode(0,255,0) $" (GREEN!)";
+        } else {
+            effects[i]=effects[i] $ GenerateRGBTextCode(255,0,0) $ " (RED!)";
+        }
+        effects[i]=effects[i] $ GenerateRGBTextCode(255,255,255);
+        i++;
+    }
+    if (momentumTimer > 0) {
+        effects[i]="Massive Momentum: "$momentumTimer;
+        i++;
+    }
 
     numEffects=i;
 }
@@ -314,6 +370,8 @@ simulated function GetEffectList(out string effects[20], out int numEffects)
 //One Second timer updates
 function PeriodicUpdates()
 {
+    local bool change;
+
     if (behindTimer > 0) {
         behindTimer--;
         if (behindTimer <= 0) {
@@ -361,6 +419,14 @@ function PeriodicUpdates()
             BounceAllPlayers();
         }
     } 
+    if (tauntTimer > 0) {
+        tauntTimer--;
+        if (tauntTimer <= 0) {
+            StopCrowdControlEvent("thrust",true);
+        } else if ((tauntTimer % 2) == 0){
+            PlayTaunt(curTaunt);
+        }
+    } 
     if (hotPotatoTimer > 0) {
         hotPotatoTimer--;
         if (hotPotatoTimer <= 0) {
@@ -391,6 +457,18 @@ function PeriodicUpdates()
         thornsTimer--;
         if (thornsTimer <= 0) {
             StopCrowdControlEvent("thorns",true);
+        }
+    }  
+    if (winHalfDmgTimer > 0) {
+        winHalfDmgTimer--;
+        if (winHalfDmgTimer <= 0) {
+            StopCrowdControlEvent("winner_half_dmg",true);
+        }
+    }  
+    if (momentumTimer > 0) {
+        momentumTimer--;
+        if (momentumTimer <= 0) {
+            StopCrowdControlEvent("massive_momentum",true);
         }
     }  
     if (forceWeaponTimer > 0) {
@@ -428,6 +506,40 @@ function PeriodicUpdates()
         }
     }
 
+    if (redLightTimer > 0) {
+        redLightTimer--;
+        indLightTime++;
+        redLightGrace=false;
+        if (redLightTimer <= 0) {
+            StopCrowdControlEvent("red_light_green_light",true);
+        } else {
+            if (indLightTime>LightMinimumTime){
+                change=false;
+
+                if (greenLight && indLightTime>GreenLightMaxTime) {
+                    change = true;
+                }
+                if (!greenLight && indLightTime>RedLightMaxTime) {
+                    change = true;
+                }
+                if (Rand(10)==0) { //10% chance
+                    change = true;
+                }
+
+                if (change){ 
+                    indLightTime=0;
+                    greenLight=!greenLight; //Toggle light
+                    if (greenLight){
+                        Broadcast(GenerateRGBTextCode(0,255,0)$"GREEN LIGHT!");
+                    } else {
+                        redLightGrace=true;
+                        Broadcast(GenerateRGBTextCode(255,0,0)$"RED LIGHT!");
+                    }
+                }
+            }
+        }
+    }  
+
     
 
 }
@@ -456,8 +568,40 @@ function ContinuousUpdates()
             game.MinPlayers = Max(cfgMinPlayers+numAddedBots, game.NumPlayers + numAddedBots);
         }
     }
+
+    if (redLightTimer > 0 && greenLight==false && redLightGrace==false) {
+        CheckRedLightMovement();
+    }
 }
 
+function CheckRedLightMovement()
+{
+    local Pawn p;
+    local TeamGame tg;
+    local bool prevScoreTeamKills;
+
+    tg = TeamGame(Level.Game);
+    if (tg!=None){
+        prevScoreTeamKills=tg.bScoreTeamKills;
+        tg.bScoreTeamKills=false;
+    }
+
+    foreach AllActors(class'Pawn',p){
+        if (VSize(p.Velocity)>10){
+            p.TakeDamage
+            (
+                10000,
+                p,
+                p.Location,
+                Vect(0,0,0),
+                class'RedLight'
+            );
+        }
+    }
+    if (tg!=None){
+        tg.bScoreTeamKills=prevScoreTeamKills;
+    }
+}
 
 
 //Called every time there is a kill
@@ -739,7 +883,6 @@ function RemoveAllAmmoFromPawn(Pawn p)
 {
     local Inventory Inv;
     for( Inv=p.Inventory; Inv!=None; Inv=Inv.Inventory ) {
-        PlayerController(p.Controller).ClientMessage("Inventory "$Inv);
         if ( Ammunition(Inv) != None ) {
             Ammunition(Inv).AmmoAmount = 0;
         } else if (Weapon(Inv)!=None){
@@ -1934,6 +2077,7 @@ function int FirstPlaceSlow(String viewer, int duration)
         duration = SingleSlowTimerDefault;
     }
     speedTimer = duration;
+    bFast=False;
     targetPlayer=p.Controller.GetHumanReadableName();
 
     Broadcast(viewer$" made "$p.Controller.GetHumanReadableName()$" slow as punishment for being in first place!");
@@ -2204,12 +2348,12 @@ function int StartVampireMode(string viewer, int duration)
     }
 
     //Check if game rule is already in place, fail if it is
-    if (IsGameRuleActive(class'VampireGameRules')){
+    if (IsGameRuleActive(class'WorkingVampireGameRules')){
         return TempFail;
     }
 
     //Attempt to add the game rules, fail if it doesn't for some reason
-    if (!AddNewGameRule(class'VampireGameRules')){
+    if (!AddNewGameRule(class'WorkingVampireGameRules')){
         return TempFail;
     }
 
@@ -2233,6 +2377,9 @@ function int StartTeamDamageMode(string viewer, int duration, bool holdingTeam)
         return TempFail;
     }
     if (thornsTimer>0){
+        return TempFail;
+    }
+    if (winHalfDmgTimer>0){
         return TempFail;
     }
     if (xBombingRun(Level.Game)==None && ASGameInfo(Level.Game)==None){
@@ -2328,6 +2475,82 @@ function int StartThornsMode(string viewer, int duration)
         duration = ThornsTimerDefault;
     }
     thornsTimer = duration;
+    return Success;
+}
+
+function int StartWinnerHalfDamageMode(string viewer, int duration)
+{
+    if (teamDamageTimer>0) {
+        return TempFail;
+    }
+    if (winHalfDmgTimer>0){
+        return TempFail;
+    }
+    //Check if game rule is already in place, fail if it is
+    if (IsGameRuleActive(class'WinningHalfDamageRules')){
+        return TempFail;
+    }
+
+    //Attempt to add the game rules, fail if it doesn't for some reason
+    if (!AddNewGameRule(class'WinningHalfDamageRules')){
+        return TempFail;
+    }
+
+    Broadcast(viewer@"made the winner do half damage!");
+    if (duration==0){
+        duration = WinHalfDmgTimerDefault;
+    }
+
+    winHalfDmgTimer = duration;
+    return Success;
+}
+
+function int StartMassiveMomentum(string viewer, int duration)
+{
+    if (momentumTimer>0){
+        return TempFail;
+    }
+    //Check if game rule is already in place, fail if it is
+    if (IsGameRuleActive(class'MassiveMomentumRules')){
+        return TempFail;
+    }
+
+    //Attempt to add the game rules, fail if it doesn't for some reason
+    if (!AddNewGameRule(class'MassiveMomentumRules')){
+        return TempFail;
+    }
+
+    Broadcast(viewer@"made all damage impart massive momentum!");
+    if (duration==0){
+        duration = MomentumTimerDefault;
+    }
+
+    momentumTimer = duration;
+    return Success;
+}
+
+function int StartRedLightGreenLight(string viewer, int duration)
+{
+    if (bounceTimer>0) {
+        return TempFail;
+    }
+    if (iceTimer>0) {
+        return TempFail;
+    }
+    if (redLightTimer>0) {
+        return TempFail;
+    }
+
+    Broadcast(viewer@"wants to play 'Red Light, Green Light'!");
+
+    if (duration==0){
+        duration = RedLightTimerDefault;
+    }
+
+    redLightTimer = duration;
+    indLightTime=0;
+    greenLight=True;
+
     return Success;
 }
 
@@ -2454,6 +2677,10 @@ function int EnableIcePhysics(string viewer, int duration)
     if (floodTimer>0) {
         return TempFail;
     }
+
+    if (redLightTimer>0) {
+        return TempFail;
+    }
     
     if (duration==0){
         duration = IceTimerDefault;
@@ -2514,6 +2741,9 @@ function int StartFog(string viewer, int duration)
 
 function int StartBounce(string viewer, int duration)
 {
+    if (redLightTimer>0) {
+        return TempFail;
+    }
     if (bounceTimer>0) {
         return TempFail;
     }
@@ -2528,15 +2758,45 @@ function int StartBounce(string viewer, int duration)
 }
 
 
-function int PlayTaunt(string viewer, optional name tauntSeq)
+function int PlayTauntEffect(string viewer, int duration, optional name tauntSeq)
+{
+    local bool found;
+
+    found=False;
+
+    if (tauntTimer>0) {
+        return TempFail;
+    }
+
+    found = PlayTaunt(tauntSeq);
+
+    if (!found){
+        return TempFail;
+    }
+
+    if (duration==0){
+        duration = TauntTimerDefault;
+    }
+    tauntTimer = duration;
+    curTaunt = tauntSeq;
+
+    Broadcast(viewer@"made everyone wiggle!");
+
+    return Success;
+}
+
+function bool PlayTaunt(optional name tauntSeq)
 {
     local UnrealPlayer p;
+    local Bot b;
     local bool found;
+    local name tauntName;
 
     found=False;
 
     foreach AllActors(class'UnrealPlayer',p){
         if (p.Pawn==None){continue;}
+        log("Playing taunt "$tauntSeq$" on player "$p.Pawn.Name);
 
         if (tauntSeq!=''){
             p.Taunt(tauntSeq);
@@ -2546,14 +2806,50 @@ function int PlayTaunt(string viewer, optional name tauntSeq)
         found=True;
     }
 
-    if (!found){
-        return TempFail;
+    foreach AllActors(class'Bot',b){
+        if (b.Pawn==None){
+            log("Skipping bot "$b.Name$" because it has no pawn");
+            continue;
+        }
+
+        tauntName='';
+        if (tauntSeq!=''){
+            tauntName=tauntSeq;
+        } else {
+            tauntName=RandomBotTaunt(b);
+        }
+
+        if (!b.Pawn.FindValidTaunt(tauntName) && tauntSeq!=''){
+            //If the specified taunt isn't valid for that pawn, let them do something else instead
+            tauntName=RandomBotTaunt(b);
+            log("Picking random taunt for "$b.Pawn.Name$" instead of the specified one because it wasn't valid");
+        }
+
+        if (tauntName!='' && b.Pawn.FindValidTaunt(tauntName)){
+            b.Pawn.SetAnimAction(tauntName);
+            found=True;
+            log("Playing taunt "$tauntName$" on bot "$b.Pawn.Name);
+        } else {
+            log("Skipping bot "$b.Pawn.Name$" because it didn't find a valid taunt");
+        }
     }
 
-    Broadcast(viewer@"made everyone wiggle!");
-
-    return Success;
+    return found;
 }
+
+function name RandomBotTaunt(Bot b)
+{
+	local int tauntNum;
+
+	if(b.Pawn == None)
+		return '';
+
+	// First 4 taunts are 'order' anims. Don't pick them.
+	tauntNum = Rand(b.Pawn.TauntAnims.Length - 4);
+	return b.Pawn.TauntAnims[4 + tauntNum];
+}
+
+
 
 function int TeamBalance(string viewer)
 {
@@ -2565,6 +2861,11 @@ function int TeamBalance(string viewer)
     
     tg=TeamGame(Level.Game);
     if (tg==None){
+        return TempFail;
+    }
+
+    //Don't allow this effect in single player ladder matches - it screws things up too much
+    if (tg.CurrentGameProfile!=None && tg.CurrentGameProfile.bInLadderGame){
         return TempFail;
     }
 
@@ -2618,6 +2919,10 @@ simulated function int SetAllPlayerAnnouncerVoice(string viewer, string announce
         return TempFail;
     }
     voiceName="";
+
+    //For reasons, the announcer name doesn't include the package name, so attach it here
+    announcer = "UnrealGame."$announcer;
+
     VoiceClass = class<AnnouncerVoice>(DynamicLoadObject(announcer,class'Class'));
 
     foreach AllActors(class'PlayerController',pc){
@@ -2807,11 +3112,19 @@ function EndOctoJump()
 ////                                  CROWD CONTROL EFFECT MAPPING                                       ////
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+function ResetEffectSelectability()
+{
+    effectSelectInit=False;
+}
+
 function HandleEffectSelectability(UT2k4CrowdControlLink ccLink)
 {
     local bool adrenaline;
+    local bool ladderGame;
 
     if (effectSelectInit==False){
+        ladderGame = (Level.Game.CurrentGameProfile!=None && Level.Game.CurrentGameProfile.bInLadderGame);
+
         ccLink.sendEffectSelectability("full_fat",isLocal);
         ccLink.sendEffectSelectability("skin_and_bones",isLocal);
         ccLink.sendEffectSelectability("limbless",isLocal);
@@ -2819,7 +3132,7 @@ function HandleEffectSelectability(UT2k4CrowdControlLink ccLink)
         ccLink.sendEffectSelectability("announcer",isLocal);
         ccLink.sendEffectSelectability("reset_domination_control_points",xDoubleDom(Level.Game)!=None);
         ccLink.sendEffectSelectability("return_ctf_flags",CTFGame(Level.Game)!=None);
-        ccLink.sendEffectSelectability("team_balance",TeamGame(Level.Game)!=None);
+        ccLink.sendEffectSelectability("team_balance",TeamGame(Level.Game)!=None && !ladderGame);
         ccLink.sendEffectSelectability("heal_onslaught_cores",ONSOnslaughtGame(Level.Game)!=None);
         ccLink.sendEffectSelectability("reset_onslaught_links",ONSOnslaughtGame(Level.Game)!=None);
         ccLink.sendEffectSelectability("fumble_bombing_run_ball",xBombingRun(Level.Game)!=None);
@@ -2883,6 +3196,10 @@ function StopAllCrowdControlEvents()
     StopCrowdControlEvent("thorns");
     StopCrowdControlEvent("octojump");
     StopCrowdControlEvent("pint_sized");
+    StopCrowdControlEvent("thrust");
+    StopCrowdControlEvent("winner_half_dmg");
+    StopCrowdControlEvent("red_light_green_light");
+    StopCrowdControlEvent("massive_momentum");
 }
 
 function int StopCrowdControlEvent(string code, optional bool bKnownStop)
@@ -2902,6 +3219,7 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
                 SetAllPlayersGroundSpeed(class'Pawn'.Default.GroundSpeed);
                 Broadcast("Returning to normal move speed...");
                 speedTimer=0;
+                targetPlayer="";
             }
             break;
         case "ice_physics":
@@ -2928,7 +3246,7 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
             break;
         case "vampire_mode":
             if (bKnownStop || vampireTimer > 0){
-                RemoveGameRule(class'VampireGameRules');
+                RemoveGameRule(class'WorkingVampireGameRules');
                 Broadcast("You no longer feed on the blood of others...");
                 vampireTimer=0;
             }
@@ -2981,6 +3299,13 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
                 bounceTimer=0;
             }
             break;
+        case "thrust":
+            if (bKnownStop || tauntTimer > 0){
+                Broadcast("The time for taunting has ended...");
+                tauntTimer=0;
+                curTaunt='';
+            }
+            break;
         case "bombing_run_hot_potato":
             if (bKnownStop || hotPotatoTimer > 0){
                 Broadcast("The hot potato cools off...");
@@ -3023,7 +3348,28 @@ function int StopCrowdControlEvent(string code, optional bool bKnownStop)
                 octoJumpTimer=0;
             }
             break;
-        
+        case "winner_half_dmg":
+            if (bKnownStop || winHalfDmgTimer > 0){
+                RemoveGameRule(class'WinningHalfDamageRules');
+                Broadcast("The winner can do full damage again...");
+                winHalfDmgTimer=0;
+            }
+            break;
+        case "red_light_green_light":
+            if (bKnownStop || redLightTimer > 0){
+                Broadcast("'Red Light, Green Light' is over!");
+                redLightTimer=0;
+                indLightTime=0;
+            }
+            break;
+        case "massive_momentum":
+            if (bKnownStop || momentumTimer > 0){
+                RemoveGameRule(class'MassiveMomentumRules');
+                Broadcast("Damage imparts normal momentum again...");
+                momentumTimer=0;
+            }
+            break;
+            
     }
     return Success;
 }
@@ -3133,7 +3479,7 @@ simulated function int doCrowdControlEvent(string code, string param[5], string 
         case "all_regen":
             return AllPlayersRegen(viewer);
         case "thrust":
-            return PlayTaunt(viewer,'PThrust'); //Not super happy with this - needs more tweaking
+            return PlayTauntEffect(viewer,duration,'PThrust');
         case "team_balance":
             return TeamBalance(viewer);
         case "announcer":
@@ -3164,6 +3510,12 @@ simulated function int doCrowdControlEvent(string code, string param[5], string 
             return StartOctoJump(viewer,duration);
         case "pint_sized":
             return StartPintSized(viewer,duration);
+        case "winner_half_dmg":
+            return StartWinnerHalfDamageMode(viewer,duration);
+        case "red_light_green_light":
+            return StartRedLightGreenLight(viewer,duration);
+        case "massive_momentum":
+            return StartMassiveMomentum(viewer,duration);
         default:
             Broadcast("Got Crowd Control Effect -   code: "$code$"   viewer: "$viewer );
             break;

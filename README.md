@@ -22,7 +22,27 @@ Want to try this out on the greater internet?  You'll probably want to connect t
 
 ## Campaign Mode
 
-At the moment, there is no support for using Crowd Control in the single player campaign.  However, you may have luck using this unrelated mod: [UT2004 LAN Co-op Tournament](https://www.moddb.com/games/unreal-tournament-2004/addons/ut2004-lan-tournament-beta-1)
+Campaign support for Crowd Control (including Simulated Crowd Control or the Randomizer, or all at once) is here!  Unfortunately this requires some additional setup beyond the normal installation and you **cannot** use an existing campaign save (in fact, you can't even load them at the moment).
+
+Locate your UT2004.ini file in the System directory and open it.
+
+Find the line that starts with "GUIController=" and change it to
+
+```
+GUIController=UT2k4CrowdControl.UT2K4GUIControllerMutator
+```
+
+and you should be able to create a new save in the Single Player menu and start playing Crowd Control!
+
+If you want to revert to the normal single player campaign, you can change that line back to:
+
+```
+GUIController=GUI2K4.UT2K4GUIController
+```
+
+## Adjusting Mutators Used in Campaign Mode
+
+After you have created a Single Player profile, go to the Mutators tab before starting a match.  Select the mutators you want to use (eg. Crowd Control, Simulated Crowd Control, or Randomizer), then start the match.  These mutators will be remembered for any subsequent games, but can be changed at any time between matches!
 
 ## Feedback
   

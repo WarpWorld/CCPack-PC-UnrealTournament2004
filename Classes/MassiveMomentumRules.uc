@@ -1,22 +1,23 @@
-class HeadShotsOnlyRules extends GameRules;
+class MassiveMomentumRules extends GameRules;
+
+var int momentumMult;
 
 function int NetDamage( int OriginalDamage, int Damage, pawn injured, pawn instigatedBy, vector HitLocation, out vector Momentum, class<DamageType> DamageType )
 {
-    local int NewDamage;
+    //if (PlayerController(instigatedBy.Controller)!=None){
+    //    Level.Game.Broadcast(instigatedBy,"Momentum dealt was "$Momentum);
+    //}
 
-    //Sneak these special Crowd Control damage types past the headshot restriction
-    if (DamageType==class'HotPotato' || DamageType==class'ThanosSnapped' || DamageType==class'Thorns'){
-        NewDamage = Damage;
-    } else if (!injured.IsHeadShot(HitLocation,injured.Location-instigatedBy.Location, 1.0)){
-        NewDamage = 0;
-    } else {
-        NewDamage = Damage;
+    if (VSize(Momentum)<1){
+        //apply some baseline momentum to work from
+        Momentum = Normal(injured.Location - instigatedBy.Location) * Damage * 2;
     }
+    Momentum = Momentum * momentumMult;
 
     if ( NextGameRules != None )
-        return NextGameRules.NetDamage( OriginalDamage,NewDamage,injured,instigatedBy,HitLocation,Momentum,DamageType );
+        return NextGameRules.NetDamage( OriginalDamage,Damage,injured,instigatedBy,HitLocation,Momentum,DamageType );
 
-    return NewDamage;
+    return Damage;
 }
 
 //
@@ -30,4 +31,9 @@ function GetServerDetails( out GameInfo.ServerResponseLine ServerState )
     ServerState.ServerInfo.Length = i+1;
     ServerState.ServerInfo[i].Key = "Mutator";
     ServerState.ServerInfo[i].Value = GetHumanReadableName();
+}
+
+defaultproperties
+{
+    momentumMult=25
 }

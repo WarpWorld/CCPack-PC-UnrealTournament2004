@@ -62,11 +62,11 @@ def randomWeapon():
 
 def randomAnnouncer():
     announce = []
-    announce.append('UnrealGame.MaleAnnouncer')
-    announce.append('UnrealGame.FemaleAnnouncer')
-    announce.append('UnrealGame.ClassicAnnouncer')
-    announce.append('UnrealGame.UTClassicAnnouncer')
-    announce.append('UnrealGame.SexyFemaleAnnouncer')
+    announce.append('MaleAnnouncer')
+    announce.append('FemaleAnnouncer')
+    announce.append('ClassicAnnouncer')
+    announce.append('UTClassicAnnouncer')
+    announce.append('SexyFemaleAnnouncer')
 
     return random.choice(announce)
 
@@ -122,6 +122,9 @@ def pickEffect():
     effects.append(("announcer",[randomAnnouncer()]))
     effects.append(("heal_onslaught_cores",None))
     effects.append(("reset_onslaught_links",None))
+    effects.append(("winner_half_dmg",None))
+    effects.append(("red_light_green_light",None))
+    effects.append(("massive_momentum",None))
 
     return random.choice(effects)
 

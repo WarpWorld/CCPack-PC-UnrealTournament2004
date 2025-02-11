@@ -44,11 +44,11 @@ public class UnrealTournament2004 : SimpleTCPPack<SimpleTCPServerConnector>
 
     //Announcer List
     private static readonly ParameterDef announcerList = new("Announcer", "announcer",
-        new Parameter("Male Announcer", "UnrealGame.MaleAnnouncer"),
-        new Parameter("Female Announcer", "UnrealGame.FemaleAnnouncer"),
-        new Parameter("UT2003 Announcer", "UnrealGame.ClassicAnnouncer"),
-        new Parameter("UT99 Announcer", "UnrealGame.UTClassicAnnouncer"),
-        new Parameter("Sexy Female Announcer", "UnrealGame.SexyFemaleAnnouncer")
+        new Parameter("Male Announcer", "MaleAnnouncer"),
+        new Parameter("Female Announcer", "FemaleAnnouncer"),
+        new Parameter("UT2003 Announcer", "ClassicAnnouncer"),
+        new Parameter("UT99 Announcer", "UTClassicAnnouncer"),
+        new Parameter("Sexy Female Announcer", "SexyFemaleAnnouncer")
     );
 
     public override EffectList Effects { get; } = new Effect[]
