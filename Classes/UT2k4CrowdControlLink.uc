@@ -33,7 +33,7 @@ function Init(CrowdControl cc, string addr)
 {
     
     //UPDATE VERSION EACH RELEASE!
-    version = "v1.0.0";
+    version = "v1.2.3";
     
     ccModule = cc;
     crowd_control_addr = addr; 
@@ -231,6 +231,7 @@ simulated function ManualReceiveBinary() {
 }
 event Opened(){
     Level.Game.Broadcast(self,"Crowd Control ("$version$") connection opened");
+    ccEffects.ResetEffectSelectability(); //Allow selectability to be recalculated
 }
 
 event Closed(){
