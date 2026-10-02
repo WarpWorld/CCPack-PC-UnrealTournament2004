@@ -1,5 +1,12 @@
 # Crowd Control for Unreal Tournament 2004
 
+## Pack metadata
+
+- **Game:** Unreal Tournament 2004
+- **Crowd Control game ID:** `UnrealTournament2004`
+- **Connector:** `SimpleTCPServerConnector`
+- **Port:** `43384`
+
 This is a mutator which can be used to connect to the Crowd Control service, which allows Twitch Viewers to interact with a game that a streamer is participating in.
 Since only one instance of Crowd Control can be attached at a time, most effects apply to all players on the server simultaneously.  A few apply to the player in first/last place, and a few more apply to random players.
 
