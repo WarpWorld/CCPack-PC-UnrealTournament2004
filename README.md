@@ -45,8 +45,5 @@ GUIController=GUI2K4.UT2K4GUIController
 After you have created a Single Player profile, go to the Mutators tab before starting a match.  Select the mutators you want to use (eg. Crowd Control, Simulated Crowd Control, or Randomizer), then start the match.  These mutators will be remembered for any subsequent games, but can be changed at any time between matches!
 
 ## Feedback
-  
+
 Join the Discord server to discuss this mod or to provide feedback: https://mods4ever.com/discord
-
-  
-
